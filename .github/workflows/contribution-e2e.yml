@@ -44,7 +44,8 @@ jobs:
         run: npm run test:e2e:obsidian:two-vault-sync 2>&1 | tee .e2e-evidence/two-vault.log
       - name: Stop disposable service
         if: always()
-        run: npm run test:docker-couchdb:stop || true
+        timeout-minutes: 2
+        run: timeout 60s docker rm -f couchdb-test || true
       - uses: actions/upload-artifact@v6
         if: always()
         with:
