@@ -44,6 +44,30 @@ jobs:
         run: npm run test:e2e:obsidian:install-appimage
       - name: Real configured startup and restart
         run: npm run test:e2e:obsidian:startup-scan 2>&1 | tee contribution-e2e-evidence/startup.log
+      - name: Add failure-only session diagnostics
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const path = 'node_modules/@vrtmrz/obsidian-test-session/dist/session.js';
+          const source = fs.readFileSync(path, 'utf8');
+          const marker = '        const output = app.output();';
+          if (source.split(marker).length !== 2) throw new Error('Unexpected diagnostic insertion point');
+          const diagnostic = `        try {
+                      await withObsidianPage(remoteDebuggingPort, async (page) => {
+                          console.error('SESSION_FAILURE_STATE', JSON.stringify(await page.evaluate(() => ({
+                              url: location.href,
+                              appPresent: !!globalThis.app,
+                              manifestPresent: !!globalThis.app?.plugins?.manifests?.['obsidian-livesync'],
+                              pluginLoaded: !!globalThis.app?.plugins?.plugins?.['obsidian-livesync'],
+                              documentReady: document.readyState,
+                              modals: [...document.querySelectorAll('.modal-title')].map(e => e.textContent)
+                          }))));
+                          await page.screenshot({path:'contribution-e2e-evidence/session-failure.png'});
+                      });
+                  } catch (diagnosticError) { console.error('SESSION_DIAGNOSTIC_ERROR', String(diagnosticError)); }
+          `;
+          fs.writeFileSync(path, source.replace(marker, diagnostic + marker));
+          NODE
       - name: Real two-Vault synchronisation
         run: npm run test:e2e:obsidian:two-vault-sync 2>&1 | tee contribution-e2e-evidence/two-vault.log
       - name: Stop disposable service
