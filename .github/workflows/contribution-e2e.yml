@@ -4,6 +4,9 @@ on:
     branches: [ci/isolated-startup-e2e]
 permissions:
   contents: read
+defaults:
+  run:
+    shell: bash
 jobs:
   obsidian:
     runs-on: ubuntu-latest
@@ -20,11 +23,11 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y xvfb libasound2t64 libnss3 libgbm1
       - name: Build exact contribution source
         run: |
-          mkdir -p .e2e-evidence
-          git rev-parse HEAD | tee .e2e-evidence/source.txt
+          mkdir -p contribution-e2e-evidence
+          git rev-parse HEAD | tee contribution-e2e-evidence/source.txt
           npm ci
           npm run build
-          sha256sum main.js > .e2e-evidence/bundle.sha256
+          sha256sum main.js > contribution-e2e-evidence/bundle.sha256
       - name: Prepare disposable CouchDB
         run: |
           cat > .test.env <<'EOF'
@@ -36,12 +39,13 @@ jobs:
           npm run test:docker-couchdb:start
       - name: Install isolated Obsidian AppImage
         env:
-          E2E_OBSIDIAN_APPIMAGE_URL: https://github.com/obsidianmd/obsidian-releases/releases/download/v1.12.7/Obsidian-1.12.7.AppImage
+          E2E_OBSIDIAN_VERSION: 1.14.5
+          E2E_OBSIDIAN_APPIMAGE_URL: https://github.com/obsidianmd/obsidian-releases/releases/download/v1.14.5/Obsidian-1.14.5.AppImage
         run: npm run test:e2e:obsidian:install-appimage
       - name: Real configured startup and restart
-        run: npm run test:e2e:obsidian:startup-scan 2>&1 | tee .e2e-evidence/startup.log
+        run: npm run test:e2e:obsidian:startup-scan 2>&1 | tee contribution-e2e-evidence/startup.log
       - name: Real two-Vault synchronisation
-        run: npm run test:e2e:obsidian:two-vault-sync 2>&1 | tee .e2e-evidence/two-vault.log
+        run: npm run test:e2e:obsidian:two-vault-sync 2>&1 | tee contribution-e2e-evidence/two-vault.log
       - name: Stop disposable service
         if: always()
         timeout-minutes: 2
@@ -50,4 +54,4 @@ jobs:
         if: always()
         with:
           name: contribution-obsidian-e2e
-          path: .e2e-evidence/
+          path: contribution-e2e-evidence/
