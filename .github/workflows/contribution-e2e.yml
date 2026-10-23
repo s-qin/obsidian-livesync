@@ -1,0 +1,50 @@
+name: Isolated contribution Obsidian E2E
+on:
+  push:
+    branches: [ci/isolated-startup-e2e]
+permissions:
+  contents: read
+jobs:
+  obsidian:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: fc2b35e0dc8538a639ba7efd8bcfd97001fc769d
+          persist-credentials: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24.x'
+      - name: Prepare ephemeral Linux host
+        run: sudo apt-get update && sudo apt-get install -y xvfb libasound2t64 libnss3 libgbm1
+      - name: Build exact contribution source
+        run: |
+          mkdir -p .e2e-evidence
+          git rev-parse HEAD | tee .e2e-evidence/source.txt
+          npm ci
+          npm run build
+          sha256sum main.js > .e2e-evidence/bundle.sha256
+      - name: Prepare disposable CouchDB
+        run: |
+          cat > .test.env <<'EOF'
+          hostname=http://127.0.0.1:5989/
+          dbname=contribution-e2e
+          username=admin
+          password=testpassword
+          EOF
+          npm run test:docker-couchdb:start
+      - name: Install isolated Obsidian AppImage
+        run: npm run test:e2e:obsidian:install-appimage
+      - name: Real configured startup and restart
+        run: npm run test:e2e:obsidian:startup-scan 2>&1 | tee .e2e-evidence/startup.log
+      - name: Real two-Vault synchronisation
+        run: npm run test:e2e:obsidian:two-vault-sync 2>&1 | tee .e2e-evidence/two-vault.log
+      - name: Stop disposable service
+        if: always()
+        run: npm run test:docker-couchdb:stop || true
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: contribution-obsidian-e2e
+          path: .e2e-evidence/
