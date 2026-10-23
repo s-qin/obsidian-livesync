@@ -35,6 +35,8 @@ jobs:
           EOF
           npm run test:docker-couchdb:start
       - name: Install isolated Obsidian AppImage
+        env:
+          E2E_OBSIDIAN_APPIMAGE_URL: https://github.com/obsidianmd/obsidian-releases/releases/download/v1.12.7/Obsidian-1.12.7.AppImage
         run: npm run test:e2e:obsidian:install-appimage
       - name: Real configured startup and restart
         run: npm run test:e2e:obsidian:startup-scan 2>&1 | tee .e2e-evidence/startup.log
