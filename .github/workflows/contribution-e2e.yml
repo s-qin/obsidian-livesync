@@ -44,6 +44,24 @@ jobs:
         run: npm run test:e2e:obsidian:install-appimage
       - name: Real configured startup and restart
         run: npm run test:e2e:obsidian:startup-scan 2>&1 | tee contribution-e2e-evidence/startup.log
+      - name: Select the Vault renderer instead of detached settings
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const path = 'node_modules/@vrtmrz/obsidian-test-session/dist/ui.js';
+          const source = fs.readFileSync(path, 'utf8');
+          const marker = 'const page = context.pages()[0] ??';
+          if (source.split(marker).length !== 2) throw new Error('Unexpected renderer selection contract');
+          const replacement = `let vaultPage;
+                  for (const candidate of context.pages()) {
+                      if (await candidate.evaluate(() => !!globalThis.app?.vault).catch(() => false)) {
+                          vaultPage = candidate;
+                          break;
+                      }
+                  }
+                  const page = vaultPage ?? context.pages().find(p => p.url().startsWith('app://obsidian.md')) ?? context.pages()[0] ??`;
+          fs.writeFileSync(path, source.replace(marker, replacement));
+          NODE
       - name: Add failure-only session diagnostics
         run: |
           node --input-type=module <<'NODE'
